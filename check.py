@@ -1,82 +1,73 @@
-import os
-from os import listdir
-from os.path import isfile, join
 import json
-from math import sqrt as s
-import subprocess
 import time
-params = {
-    "email_user": "example@gmail.com",
-    "service": "gmail",  # or outlook or yahoo
-    "save_dir_name": "mail_saved",
-    "password": "123"
-}
+import timeit
+from importlib import import_module, invalidate_caches
+from itertools import permutations
+from multiprocessing import Pool
+from pathlib import Path
+from typing import Callable, Dict, Tuple
 
-MAX_GAME_TIME = 20 #seconds
+from wrapper import Kalah
 
-#returns tuple(first_name, second_name, who_won, game_time)
-def test_for(fname1 : str, fname2 : str):
-    wrapper_code = ""
-    with open("wrapper.py", "r") as f:
-        wrapper_code = f.read()
+MAX_GAME_TIME = 20  # seconds
 
-    with open("tmp_wrapper.py", "w") as f:
-        f.write("from " + params["save_dir_name"] + "." + fname1[:-3] + " import func as F1\n")
-        f.write("from " + params["save_dir_name"] + "." + fname2[:-3] + " import func as F2\n")
-        f.write(wrapper_code)
-    res = None
-    f = open("tmp.tmp", "w")
-    start = time.time()
-    try:
-        res = subprocess.run(['python', 'tmp_wrapper.py'], timeout=MAX_GAME_TIME, stdout=f)
-    except subprocess.TimeoutExpired:
-        print(fname1 + " " + fname2 + " takes too long to finish.")
-        return (fname1, fname2, 0, 0)
-    except subprocess.CalledProcessError:
-        print(fname1 + " " + fname2 + " cannot compile")
-        return (fname1, fname2, 0, 0)
-    end = time.time()
-    f.close()
-    f = open("tmp.tmp", "r")
-    try:
-        q = int(f.read())
-    except:
-        print(fname1 + " " + fname2 + "someone printing data.")
-        return (fname1, fname2, 0, 0)
-    return (fname1, fname2, q, end-start)
 
-def main(fname = "bot.json"):
-    global params
-    # at first I just load data from json
-    with open(fname, "r") as f:
-        params.update(json.loads(f.read()))
 
-    if not os.path.exists(params["save_dir_name"]):
-        os.mkdir(params["save_dir_name"])
-    files_to_check = [f for f in listdir(params["save_dir_name"]) if isfile(join(params["save_dir_name"], f)) and f.endswith(".py")]
-    all_res = []
-    for i in range(len(files_to_check)):
-        for j in range(len(files_to_check)):
-            if i == j:
-                continue
-            res = test_for(files_to_check[i], files_to_check[j])
-            all_res.append(res)
-            print(str(len(all_res)) + "/" + str(len(files_to_check) * (len(files_to_check) - 1)))
+def battle(fmap: Dict[str, Callable]) -> Tuple[Tuple[str, str], Tuple[bool, float]]:
+    """Multiprocessing wrapper for the actual strategies' simulation
+
+    :param fmap: {file: func} mapping with 2 keys
+    :return: ((filename1, filename2), (winner, score))
+    """
+    files, funcs = zip(*fmap)
+    # b = time.perf_counter()
+    # p = Kalah(funcs).play_alpha_beta()
+    # e = time.perf_counter()
+    p, t = Kalah(funcs).play_alpha_beta()
+    # return files, Kalah(funcs).play_alpha_beta()
+    # return files, p - 1, e - b
+    return files, p-1, t
+
+
+def check(*, sols_dir: Path, p_num: int = 4):
+    """Runs every submitted solution with every other
+
+    :param sols_dir: directory to take solutions from
+    :param p_num: number of parallel workers
+    :return:
+    """
+
+    # to import new modules, which were created
+    # during the run of the program
+    invalidate_caches()
+
+    sols_dir.mkdir(parents=True, exist_ok=True)
+
+    funcs = {f.stem: import_module(f"{sols_dir}.{f.stem}").func for f in
+             filter(lambda f: f.suffix in {".py"}, sols_dir.iterdir())}
+
+    ss = len(funcs) * (len(funcs) - 1)
+    b = time.perf_counter()
+    # *all_res, = map(battle, permutations(funcs.items(), 2))
+    # with ppe(p_num) as p:
+    #     *all_res, = p.map(battle, permutations(funcs.items(), 2), chunksize=ss // p_num)
+    with Pool(p_num) as p:
+        *all_res, = p.imap_unordered(battle, permutations(funcs.items(), 2), chunksize=ss // p_num)
     print("finished testing, now computing scoreboard")
-    score_board = dict()
-    for i in files_to_check:
-      score_board[i] = 0
+    print(time.perf_counter() - b, "secs")
 
-    for round in all_res:
-        if (round[2] == 1):
-            score_board[round[0]] += MAX_GAME_TIME - round[3]
-        else:
-            score_board[round[1]] += MAX_GAME_TIME - round[3]
-    score_board_as_list = [(k, v) for k, v in score_board.items()]
-    score_board_as_list = sorted(score_board_as_list, key = lambda tup : tup[1], reverse = True)
+    score_board = dict.fromkeys(funcs.keys(), 0.0)
+    # for fs, (pl, t) in all_res:
+    for fs, pl, t in all_res:
+        score_board[fs[pl]] += MAX_GAME_TIME - t
 
-    with open("result.json", "w") as f:
+    # return score_board
+
+    # # decreasing by score
+    score_board_as_list = sorted(score_board.items(), key=lambda tup: -tup[1])
+    with Path("result.json").open("w") as f:
         f.write(json.dumps(score_board_as_list))
 
 if __name__ == "__main__":
-    main()
+    # print(timeit.timeit('check(sols_dir=Path("mail_saved"))', number=10, globals={"check": check, "Path": Path}))
+    check(sols_dir=Path("mail_saved"))
