@@ -8,6 +8,8 @@ class Kalah:
     __r = range(14)
     __h = 7
     __depth = 5
+    __trt13 = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0)  # 13th is never visited
+    __trt6 = (1, 2, 3, 4, 5, 7, 200, 8, 9, 10, 11, 12, 13, 0)  # 200 is never visited
 
     def __init__(self, funcs):
         self.current_state = [6, 6, 6, 6, 6, 6, 0, 6, 6, 6, 6, 6, 6, 0]
@@ -25,23 +27,12 @@ class Kalah:
             return True
         return False
 
-    def _transfer_stones(self, pos, ign=13):
-
+    def _transfer_stones(self, pos, trt=__trt13):
         num_stones, self.current_state[pos] = self.current_state[pos], 0
-        pos += 1
-
-        if ign == 13:
-            for _ in range(num_stones):
-                if pos == 13:
-                    pos = 0
-                self.current_state[pos], pos = self.current_state[pos] + 1, pos + 1
-        else:
-            for _ in range(num_stones):
-                if pos == 6:
-                    pos = 7
-                if pos == 14:
-                    pos = 0
-                self.current_state[pos], pos = self.current_state[pos] + 1, pos + 1
+        pos = trt[pos]
+        for _ in range(num_stones):
+            self.current_state[pos] += 1
+            pos = trt[pos]
 
     def max_alpha_beta(self, deep, alpha, beta):
         maxv = -1990
@@ -78,7 +69,7 @@ class Kalah:
         for i in self.__r[self.__p2r]:
             if self.current_state[i]:
                 tmp = self.current_state.copy()
-                self._transfer_stones(i, ign=6)
+                self._transfer_stones(i, trt=self.__trt6)
 
                 m, _ = self.max_alpha_beta(deep + 1, alpha, beta)
                 if m < minv:
