@@ -3,10 +3,10 @@ import time
 
 
 def timed(f):
-    b = time.perf_counter()
 
     @functools.wraps(f)
     def wrapper(*a, **kw):
+        b = time.perf_counter()
         return f(*a, **kw), time.perf_counter() - b
 
     return wrapper
