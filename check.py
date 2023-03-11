@@ -1,10 +1,11 @@
 import json
+import sys
 import time
 import timeit
 from collections import defaultdict
 from importlib import import_module, invalidate_caches
 from itertools import permutations
-from multiprocessing import Pool
+from multiprocessing import Pool, TimeoutError as mpTE
 from pathlib import Path
 from typing import Callable, Dict, Tuple
 
@@ -12,20 +13,17 @@ from wrapper import Kalah
 
 MAX_GAME_TIME = 20  # seconds
 
-def battle(fmap: Dict[str, Callable]) -> Tuple[Tuple[str, str], Tuple[bool, float]]:
+
+def battle(red: Dict[str, Callable], blue: Dict[str, Callable]) -> Tuple[Tuple[str, str], Tuple[float, float], float]:
     """Multiprocessing wrapper for the actual strategies' simulation
 
-    :param fmap: {file: func} mapping with 2 keys
-    :return: ((filename1, filename2), (winner, score))
+    :param red: (filename, func) of the 1st player
+    :param blue: (filename, func) of the 2nd player
+    :return: ((filename1, filename2), (score), time)
     """
-    files, funcs = zip(*fmap)
-    # b = time.perf_counter()
-    # p = Kalah(funcs).play_alpha_beta()
-    # e = time.perf_counter()
-    p, t = Kalah(funcs).play_alpha_beta()
-    # return files, Kalah(funcs).play_alpha_beta()
-    # return files, p - 1, e - b
-    return files, p, t
+    files, funcs = zip(red, blue)
+    score, t = Kalah(funcs).play_alpha_beta()
+    return files, score, t
 
 
 def calc_score(res, *, save=True):
@@ -57,13 +55,19 @@ def check(*, sols_dir: Path, p_num: int = 4):
     funcs = {f.stem: import_module(f"{sols_dir}.{f.stem}").func for f in
              filter(lambda f: f.suffix in {".py"}, sols_dir.iterdir())}
 
-    ss = len(funcs) * (len(funcs) - 1)
     b = time.perf_counter()
-    # *all_res, = map(battle, permutations(funcs.items(), 2))
-    # with ppe(p_num) as p:
-    #     *all_res, = p.map(battle, permutations(funcs.items(), 2), chunksize=ss // p_num)
-    with Pool(p_num) as p:
-        *all_res, = p.imap_unordered(battle, permutations(funcs.items(), 2), chunksize=ss // p_num)
+    all_res = []
+    with Pool(p_num) as pool:
+        res = [pool.apply_async(battle, funcs) for funcs in permutations(funcs.items(), 2)]
+        for r in res:
+            try:
+                all_res.append(r.get(timeout=MAX_GAME_TIME))
+            except mpTE as e:
+                print("TIMEOUT", e, file=sys.stderr)
+                pass
+            except Exception as e:
+                print(e, file=sys.stderr)
+
     print("finished testing, now computing scoreboard")
     print(time.perf_counter() - b, "secs")
 
