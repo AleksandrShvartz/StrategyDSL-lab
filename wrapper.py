@@ -94,10 +94,10 @@ class Kalah:
             self.current_state[:self.__h], self.current_state[self.__h:] = \
                 self.current_state[self.__h:], self.current_state[:self.__h]
             self.player ^= 1
-        # print(self.current_state[6] == self.current_state[13])
-        # changing sign affects the results table
-        # bcoz the equality isn't taken into account
-        return self.player ^ (self.current_state[6] > self.current_state[13])
+
+        if self.current_state[6] == self.current_state[13]:
+            return .5, .5
+        return (0, 1) if self.current_state[6] < self.current_state[13] ^ self.player else (1, 0)
 
 
 def main():

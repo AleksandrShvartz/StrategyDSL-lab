@@ -1,6 +1,7 @@
 import json
 import time
 import timeit
+from collections import defaultdict
 from importlib import import_module, invalidate_caches
 from itertools import permutations
 from multiprocessing import Pool
@@ -10,8 +11,6 @@ from typing import Callable, Dict, Tuple
 from wrapper import Kalah
 
 MAX_GAME_TIME = 20  # seconds
-
-
 
 def battle(fmap: Dict[str, Callable]) -> Tuple[Tuple[str, str], Tuple[bool, float]]:
     """Multiprocessing wrapper for the actual strategies' simulation
@@ -26,7 +25,19 @@ def battle(fmap: Dict[str, Callable]) -> Tuple[Tuple[str, str], Tuple[bool, floa
     p, t = Kalah(funcs).play_alpha_beta()
     # return files, Kalah(funcs).play_alpha_beta()
     # return files, p - 1, e - b
-    return files, p-1, t
+    return files, p, t
+
+
+def calc_score(res, *, save=True):
+    score = defaultdict(float)
+    for (r, b), (rs, bs), _t in res:
+        score[r] += rs * (MAX_GAME_TIME - _t)
+        score[b] += bs * (MAX_GAME_TIME - _t)
+    if save:
+        score_board_as_list = sorted(score.items(), key=lambda tup: -tup[1])
+        with Path("result.json").open("w") as f:
+            f.write(json.dumps(score_board_as_list))
+    return score
 
 
 def check(*, sols_dir: Path, p_num: int = 4):
@@ -56,17 +67,8 @@ def check(*, sols_dir: Path, p_num: int = 4):
     print("finished testing, now computing scoreboard")
     print(time.perf_counter() - b, "secs")
 
-    score_board = dict.fromkeys(funcs.keys(), 0.0)
-    # for fs, (pl, t) in all_res:
-    for fs, pl, t in all_res:
-        score_board[fs[pl]] += MAX_GAME_TIME - t
+    return calc_score(all_res)
 
-    # return score_board
-
-    # # decreasing by score
-    score_board_as_list = sorted(score_board.items(), key=lambda tup: -tup[1])
-    with Path("result.json").open("w") as f:
-        f.write(json.dumps(score_board_as_list))
 
 if __name__ == "__main__":
     # print(timeit.timeit('check(sols_dir=Path("mail_saved"))', number=10, globals={"check": check, "Path": Path}))
