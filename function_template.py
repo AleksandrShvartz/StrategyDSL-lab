@@ -1,14 +1,18 @@
-#THIS IS TEMPLATE FOR FUNCTION. PLEASE FOLLOW THE RULES:
-#1) Do Not print anything!!!
-#2) Do not exit(0) or smth
-#3) Please do not try to hack us.
+# THIS IS TEMPLATE FOR FUNCTION. PLEASE FOLLOW THE RULES:
+# 1) Do Not print anything!!!
+# 2) Do not exit(0) or smth
+# 3) Please do not try to hack us.
 
-def func(state):
-    # state is array with length 14. 
-    # values with indices 0-5 is yours pits, 6 - yours kalah
-    # values with indices 7-12 is opponent`s pits, 13 - oppenent`s kalah
-    
+def func(state: list[int]) -> int:
+    """Implementation of minimax strategy
+
+    :param state: list[int]
+        state[0:6] -- your pits, state[6] -- your kalah
+        state[8:13] -- opponent's pits, state[13] -- opponent's kalah
+    :return: int
+        result for minimax
+    """
+
     # PLACE YOUR CODE HERE
-
-    # Return result for minimax
+    # result for minimax
     return 1
