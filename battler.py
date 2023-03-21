@@ -122,7 +122,7 @@ class Battler:
                 f_name = user_func.stem
                 user_func = Battler.__import_func(user_func, func_name)
             funcs.append((f_name, user_func))
-        return self._battle(*funcs)
+        return self._battle(*funcs), self._battle(*funcs[::-1])
 
 
     @__state_dec(_State.CHECKED, _State.RAN_TOURNAMENT, f"Please load contestants before launching a tournament")
