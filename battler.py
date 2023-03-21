@@ -82,6 +82,21 @@ class Battler:
             if (func := Battler.__import_func(file, func_name)) is not None:
                 self.__funcs[file.stem] = func
 
+    def run_dummy(self, user_func: Path | Callable, dummy: Path | Callable, *, func_name: str = None):
+        # to import new modules, which were created
+        # during the run of the program
+        invalidate_caches()
+
+        if (isinstance(user_func, Path) or isinstance(dummy, Path)) and func_name is None:
+            raise ValueError("Function name should be string when passing paths")
+        funcs = []
+        for user_func, f_name in zip((user_func, dummy), ("User func", "Dummy func")):
+            if isinstance(user_func, Path):
+                f_name = user_func.stem
+                user_func = Battler.__import_func(user_func, func_name)
+            funcs.append((f_name, user_func))
+        return self._battle(*funcs)
+
     def run_tournament(self, *, n_workers: int = 4, timeout: float = 4):
 
         def _check(what, name, l_lim, u_lim):
@@ -130,6 +145,9 @@ class Battler:
 
 if __name__ == "__main__":
     b = Battler(game_cls=Kalah, game_run="play_alpha_beta")
+    from function_template import func
+
+    print(b.run_dummy(Path("mail_saved/alex_sachuk_yandex_ru.py"), func, func_name="func"))
     b.check_contestants(Path("./mail_saved"), func_name="func")
     b.run_tournament(n_workers=4, timeout=2.5)
     b.form_results()
