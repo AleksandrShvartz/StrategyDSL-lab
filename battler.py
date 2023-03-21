@@ -8,8 +8,8 @@ from importlib import import_module, invalidate_caches
 from itertools import permutations
 from multiprocessing import Pool, TimeoutError as mpTE
 from pathlib import Path
-from typing import Callable, Dict, Tuple, Any, get_type_hints, get_args
-from wrapper import Kalah
+from typing import Callable, Tuple, Any, get_type_hints, get_args
+from kalah import Kalah
 
 
 class Battler:
@@ -50,11 +50,25 @@ class Battler:
                 raise ValueError(f"{m_template} should have \'{ret_type_str}\' as annotations")
             return game_run, game_cls
 
-    def _battle(self, red: Dict[str, Callable], blue: Dict[str, Callable]) -> \
-            Tuple[Tuple[str, str], Tuple[float, float], float]:
+    def _battle(self, red: Tuple[str, Callable], blue: Tuple[str, Callable]) -> \
+            Tuple[Tuple[str, str], Tuple[float, float]]:
         files, funcs = zip(red, blue)
-        score, t = getattr(self.__c(*funcs), self.__f)() if self.__c else self.__f(*funcs)
-        return files, score, t
+        score = getattr(self.__c(*funcs), self.__f)() if self.__c else self.__f(*funcs)
+        return files, score
+
+    @staticmethod
+    def __import_func(module: Path, func_name: str):
+        err_msg = "Error importing {} function from module {!r}"
+        try:
+            rel_p = module.absolute().relative_to(Path.cwd())
+            m_dir, m_name = rel_p.parent.name, rel_p.stem
+            module = f"{m_dir and f'{m_dir}.' or ''}{m_name}"
+            return import_module(module).__dict__[func_name]
+        except ValueError:
+            print(f"Path {module.absolute()!r} is not a subpath of {Path.cwd()!r}", file=sys.stderr)
+        except KeyError as e:
+            print(err_msg.format(e, module), file=sys.stderr)
+        return None
 
     def check_contestants(self, sols_dir: Path, func_name: str, suffixes: set[str] = None):
         # to import new modules, which were created
@@ -64,11 +78,9 @@ class Battler:
         if suffixes is None:
             suffixes = {".py"}
         self.__funcs = {}
-        for f in filter(lambda f: f.suffix in suffixes, sols_dir.iterdir()):
-            try:
-                self.__funcs[f.stem] = import_module(f"{sols_dir}.{f.stem}").__dict__[func_name]
-            except KeyError:
-                print(f"File \"{f.absolute()}\" doesn't have {func_name!r} function", file=sys.stderr)
+        for file in filter(lambda f: f.suffix in suffixes, sols_dir.iterdir()):
+            if (func := Battler.__import_func(file, func_name)) is not None:
+                self.__funcs[file.stem] = func
 
     def run_tournament(self, *, n_workers: int = 4, timeout: float = 4):
 
@@ -100,9 +112,9 @@ class Battler:
 
     def form_results(self):
         self.__score = defaultdict(float)
-        for (r, b), (rs, bs), _t in self.__results:
-            self.__score[r] += rs
-            self.__score[b] += bs
+        for (red, blue), (red_score, blue_score) in self.__results:
+            self.__score[red] += red_score
+            self.__score[blue] += blue_score
         return deepcopy(self.__score)
 
     def save_results(self, dst: Path, *, desc=True) -> None:
@@ -118,7 +130,7 @@ class Battler:
 
 if __name__ == "__main__":
     b = Battler(game_cls=Kalah, game_run="play_alpha_beta")
-    b.check_contestants(Path("mail_saved"), func_name="func")
+    b.check_contestants(Path("./mail_saved"), func_name="func")
     b.run_tournament(n_workers=4, timeout=2.5)
     b.form_results()
     b.save_results(Path("result.json"))
