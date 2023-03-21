@@ -10,6 +10,7 @@ from multiprocessing import Pool, TimeoutError as mpTE
 from pathlib import Path
 from typing import Callable, Tuple, Any, get_type_hints, get_args
 from kalah import Kalah
+import aiofiles
 
 
 class Battler:
@@ -70,7 +71,7 @@ class Battler:
             print(err_msg.format(e, module), file=sys.stderr)
         return None
 
-    def check_contestants(self, sols_dir: Path, func_name: str, suffixes: set[str] = None):
+    async def check_contestants(self, sols_dir: Path, func_name: str, suffixes: set[str] = None):
         # to import new modules, which were created
         # during the run of the program
         invalidate_caches()
@@ -82,7 +83,7 @@ class Battler:
             if (func := Battler.__import_func(file, func_name)) is not None:
                 self.__funcs[file.stem] = func
 
-    def run_dummy(self, user_func: Path | Callable, dummy: Path | Callable, *, func_name: str = None):
+    async def run_dummy(self, user_func: Path | Callable, dummy: Path | Callable, *, func_name: str = None):
         # to import new modules, which were created
         # during the run of the program
         invalidate_caches()
@@ -97,7 +98,7 @@ class Battler:
             funcs.append((f_name, user_func))
         return self._battle(*funcs)
 
-    def run_tournament(self, *, n_workers: int = 4, timeout: float = 4):
+    async def run_tournament(self, *, n_workers: int = 4, timeout: float = 4):
 
         def _check(what, name, l_lim, u_lim):
             warn_template = "{} is not in [{}, {}], changed to {}"
@@ -125,30 +126,34 @@ class Battler:
         print(f"Tournament with {(n := len(self.__funcs)) * (n - 1)} battles "
               f"ended in {time.perf_counter() - start_time:.3f} secs")
 
-    def form_results(self):
+    async def form_results(self):
         self.__score = defaultdict(float)
         for (red, blue), (red_score, blue_score) in self.__results:
             self.__score[red] += red_score
             self.__score[blue] += blue_score
         return deepcopy(self.__score)
 
-    def save_results(self, dst: Path, *, desc=True) -> None:
+    async def save_results(self, dst: Path, *, desc=True) -> None:
         """Sort the results and save them in .json format
 
         :param dst: path to save results to
         :param desc: if True, sort in descending order, else ascending
         :return: None
         """
-        with dst.open("w") as f:
-            f.write(json.dumps(sorted(self.__score.items(), key=lambda tup: (1, -1)[desc] * tup[1])))
+        async with aiofiles.open(dst, "w") as f:
+            await f.write(json.dumps(sorted(self.__score.items(), key=lambda tup: (1, -1)[desc] * tup[1])))
 
 
 if __name__ == "__main__":
+    import asyncio
     b = Battler(game_cls=Kalah, game_run="play_alpha_beta")
     from function_template import func
 
-    print(b.run_dummy(Path("mail_saved/alex_sachuk_yandex_ru.py"), func, func_name="func"))
-    b.check_contestants(Path("./mail_saved"), func_name="func")
-    b.run_tournament(n_workers=4, timeout=2.5)
-    b.form_results()
-    b.save_results(Path("result.json"))
+    async def _():
+        print(await b.run_dummy(Path("mail_saved/alex_sachuk_yandex_ru.py"), func, func_name="func"))
+        await b.check_contestants(Path("./mail_saved"), func_name="func")
+        await b.run_tournament(n_workers=4, timeout=2.5)
+        await b.form_results()
+        await b.save_results(Path("result.json"))
+
+    asyncio.run(_())
