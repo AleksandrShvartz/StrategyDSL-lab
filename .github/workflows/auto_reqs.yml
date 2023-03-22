@@ -1,0 +1,32 @@
+name: auto_reqs
+
+on:
+    push
+    
+jobs:
+    build-reqs:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+            
+            - name: Set up Python
+              uses: actions/setup-python@v4
+              with:
+                python-version: "3.11"
+                
+            - name: Install pigar
+              run: |
+                pip install pigar
+                
+            - name: Generate requirements.txt
+              run: |
+                pigar gen --auto-select --question-answer yes
+                
+            - name: Add & Commit
+              uses: EndBug/add-and-commit@v9.1.1
+              with:
+                author_name: BipBop
+                author_email: kmma@fh.4eva
+                message: "Update requirements.txt"
+                add: "requirements.txt"
+
