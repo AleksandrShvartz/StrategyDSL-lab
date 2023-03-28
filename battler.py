@@ -4,6 +4,7 @@ import time
 import warnings
 from collections import defaultdict
 from copy import deepcopy
+from enum import Enum, IntEnum
 from importlib import import_module, invalidate_caches
 from itertools import permutations
 from multiprocessing import Pool, TimeoutError as mpTE
@@ -13,12 +14,36 @@ from kalah import Kalah
 import aiofiles
 
 
+class _State(IntEnum):
+    DUMMY = 0,
+    INITED = 1,
+    CHECKED = 2,
+    RAN_TOURNAMENT = 3,
+    GOT_RESULTS = 4
+
+
 class Battler:
+
+    @staticmethod
+    def __state_dec(non_valid, after_state, err_msg):
+        def wrapper(func):
+            def inner_wrapper(self, *a, **kw):
+                if self.__state < non_valid:
+                    raise RuntimeError(err_msg)
+                res = func(self, *a, **kw)
+                self.__state = after_state
+                return res
+
+            return inner_wrapper
+
+        return wrapper
+
     def __init__(self, *, game_run: Callable[[Any], Tuple[float, float]] | str, game_cls: Any = None):
         self.__funcs = {}
         self.__score = {}
         self.__results = []
         self.__f, self.__c = Battler.__check_correctness(game_run, game_cls)
+        self.__state = _State.INITED
 
     @staticmethod
     def __check_correctness(game_run, game_cls):
@@ -71,6 +96,7 @@ class Battler:
             print(err_msg.format(e, module), file=sys.stderr)
         return None
 
+    @__state_dec(_State.DUMMY, _State.CHECKED, "Wow, you've nailed it")
     async def check_contestants(self, sols_dir: Path, func_name: str, suffixes: set[str] = None):
         # to import new modules, which were created
         # during the run of the program
@@ -98,8 +124,9 @@ class Battler:
             funcs.append((f_name, user_func))
         return self._battle(*funcs)
 
-    async def run_tournament(self, *, n_workers: int = 4, timeout: float = 4):
 
+    @__state_dec(_State.CHECKED, _State.RAN_TOURNAMENT, f"Please load contestants before launching a tournament")
+    async def run_tournament(self, *, n_workers: int = 4, timeout: float = 4):
         def _check(what, name, l_lim, u_lim):
             warn_template = "{} is not in [{}, {}], changed to {}"
             if not u_lim >= what >= l_lim:
@@ -126,6 +153,7 @@ class Battler:
         print(f"Tournament with {(n := len(self.__funcs)) * (n - 1)} battles "
               f"ended in {time.perf_counter() - start_time:.3f} secs")
 
+    @__state_dec(_State.RAN_TOURNAMENT, _State.GOT_RESULTS, f"Please launch a tournament before getting the results")
     async def form_results(self):
         self.__score = defaultdict(float)
         for (red, blue), (red_score, blue_score) in self.__results:
@@ -133,6 +161,7 @@ class Battler:
             self.__score[blue] += blue_score
         return deepcopy(self.__score)
 
+    @__state_dec(_State.GOT_RESULTS, _State.DUMMY, f"Please collect the results first `form_results`")
     async def save_results(self, dst: Path, *, desc=True) -> None:
         """Sort the results and save them in .json format
 
