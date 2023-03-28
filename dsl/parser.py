@@ -9,8 +9,8 @@ class Grammar(object):
         self.cur_indent = ''
         self.cur_prefix = ''
         self.colon = pp.Literal(':')
-        self.lbrace = pp.Suppress('{')
-        self.rbrace = pp.Suppress('}')
+        self.lbrace = pp.Literal('{')
+        self.rbrace = pp.Literal('}')
         self.lbrack = pp.Literal('[')
         self.rbrack = pp.Literal(']')
         self.lparen = pp.Literal('(')
@@ -122,29 +122,34 @@ class Grammar(object):
         self.operator.set_debug()
         self.answer.set_debug()
         self.arith_exp.set_debug()
-        self.arith_exp.add_parse_action(self._debug_print)
+        # self.arith_exp.add_parse_action(self._debug_print)
         self.foreach.set_debug()
         self.if_op.set_debug()
         self.imp_op.set_debug()
         self.number.set_debug()
 
 
-    def _return_action(self, toks):
-        self.py_code += 'return '
+    def _return_action(self, s: str, loc: int, tokens):
+        print('Return : ', s, loc, tokens)
+        parsed_value = 'return ' + tokens[1]
+        self.py_code += parsed_value
+        # s = s[:loc] + s[loc+len(parsed_value):]
 
-    def _block_action(self, toks):
+
+    def _block_action(self, s: str, loc: int, tokens):
         self.cur_indent += '    '
-        print(toks)
+        self.cur_prefix += '_'
+        print('Block : ', s, loc, tokens)
 
     def _arith_exp_action(self, s: str, loc: int, tokens):
-        print(s, loc, tokens)
-        self.py_code += tokens[1]
+        print('Arith exp: ', s, loc, tokens)
+        # self.py_code += tokens[1]
 
     def _debug_print(self, s: str, loc: int, tokens):
         print(s, loc, tokens)
 
     def parse(self, code='RETURN 0'):
-        code = '{\n' + code + '}\n'
+        code = '{' + code + '}'
         self._set_debug()
         res = self.block.parse_string(code)
         return self.py_code
