@@ -1,7 +1,13 @@
-import telebot;
+import telebot.async_telebot as atb;
 import pandas as pd;
+import asyncio;
+import battler as bt;
+from pathlib import Path
 
-bot = telebot.TeleBot('5998949800:AAGj_6DfBQEbQLe-tC5B78ZdBfy3IG4ALko');
+
+b = bt.Battler(game_cls=bt.Kalah, game_run="play_alpha_beta")
+
+bot = atb.AsyncTeleBot('5998949800:AAGj_6DfBQEbQLe-tC5B78ZdBfy3IG4ALko');
 table = pd.DataFrame({
    'name': [],
    'code': [],
@@ -10,13 +16,16 @@ table = pd.DataFrame({
 save_dir = "D:/Documents/temp"
 
 @bot.message_handler(content_types=['text'])
-def get_text_messages(message):
+async def get_text_messages(message):
     
     if message.text == "/start":
         bot.send_message(message.from_user.id, "Введите /register ФАМИЛСЯ_ИМЯ_ГРУППА для регистрации")
     elif message.text[0:9] == "/register":
         register(message)
         bot.send_message(message.from_user.id, "Можешь загрузить свой файл в любое время")
+        
+    elif message.text == "/start_bt":
+       start_battle()
         
     else:
         bot.send_message(message.from_user.id, "Я тебя не понимаю.")
@@ -25,7 +34,7 @@ def get_text_messages(message):
 
 
 @bot.message_handler(content_types=['document'])
-def get_doc_messages(message):
+async def get_doc_messages(message):
     file_name = message.document.file_name
     file_id = message.document.file_name
     file_id_info = bot.get_file(message.document.file_id)
@@ -53,9 +62,20 @@ def run_test():
     print("тест")
     
 
-def send_result():
-    print("отправка")
+def send_result(res):
+    print(res)
+    
+def start_battle():
+    async def _():
+        await b.check_contestants(Path("./mail_test"), func_name="func")
+        await b.run_tournament(n_workers=4, timeout=2.5)
+        await b.form_results()
+        await b.save_results(Path("result.json"))
+
+    asyncio.run(_())
+    
 
 
-bot.polling(none_stop=True, interval=0)
+
+asyncio.run(bot.polling())
 
