@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Callable, Tuple, Any, get_type_hints, get_args
 from kalah import Kalah
 import aiofiles
-from concurrent.futures import ProcessPoolExecutor  # , wait, FIRST_COMPLETED, ALL_COMPLETED, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 import asyncio
 from concurrent.futures import TimeoutError
 
@@ -80,10 +80,9 @@ class Battler:
                 raise ValueError(f"{m_template} should have \'{ret_type_str}\' as annotations")
             return game_run, game_cls
 
-        score = getattr(self.__c(*funcs), self.__f)() if self.__c else self.__f(*funcs)
     def _battle(self, files_n_funcs: Tuple[Tuple[str, Callable]]) -> Tuple[Tuple[str, str], Tuple[float, float]]:
         files, funcs = zip(*files_n_funcs)
-
+        score = getattr(self.__c(*funcs), self.__f)() if self.__c else self.__f(*funcs)
         return files, score
 
     @staticmethod
