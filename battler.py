@@ -129,7 +129,7 @@ class Battler:
 
         try:
             return await asyncio.gather(
-                *(asyncio.wait_for(asyncio.to_thread(self._battle, *args), timeout=timeout) for args in
+                *(asyncio.wait_for(asyncio.to_thread(self._battle, args), timeout=timeout) for args in
                   (funcs, funcs[::-1])))
         except TimeoutError:
             return "Timed out"
