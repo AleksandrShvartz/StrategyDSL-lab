@@ -133,6 +133,8 @@ class Battler:
                   (funcs, funcs[::-1])))
         except TimeoutError:
             return "Timed out"
+        except Exception as e:
+            return f"Raised exception: {e}"
 
     @__state_dec(_State.CHECKED, _State.RAN_TOURNAMENT, f"Please load contestants before launching a tournament")
     async def run_tournament(self, *, n_workers: int = 4):
