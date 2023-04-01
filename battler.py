@@ -82,7 +82,14 @@ class Battler:
 
     def _battle(self, files_n_funcs: Tuple[Tuple[str, Callable]]) -> Tuple[Tuple[str, str], Tuple[float, float]]:
         files, funcs = zip(*files_n_funcs)
-        score = getattr(self.__c(*funcs), self.__f)() if self.__c else self.__f(*funcs)
+        try:
+            # cython __cinit__
+            score = getattr(self.__c.__new__(self.__c, *funcs), self.__f)() if self.__c else self.__f(*funcs)
+        except AttributeError:
+            # python __init__ as a fallback
+            score = getattr(self.__c(*funcs), self.__f)() if self.__c else self.__f(*funcs)
+        except Exception:
+            score = 0, 0
         return files, score
 
     @staticmethod
