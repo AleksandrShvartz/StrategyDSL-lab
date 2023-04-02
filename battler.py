@@ -12,6 +12,10 @@ from pathlib import Path
 from typing import Callable, Tuple, Any, get_type_hints, get_args
 from kalah import Kalah
 import aiofiles
+from concurrent.futures import ProcessPoolExecutor
+import asyncio
+from concurrent.futures import TimeoutError
+
 
 
 class _State(IntEnum):
@@ -76,9 +80,8 @@ class Battler:
                 raise ValueError(f"{m_template} should have \'{ret_type_str}\' as annotations")
             return game_run, game_cls
 
-    def _battle(self, red: Tuple[str, Callable], blue: Tuple[str, Callable]) -> \
-            Tuple[Tuple[str, str], Tuple[float, float]]:
-        files, funcs = zip(red, blue)
+    def _battle(self, files_n_funcs: Tuple[Tuple[str, Callable]]) -> Tuple[Tuple[str, str], Tuple[float, float]]:
+        files, funcs = zip(*files_n_funcs)
         score = getattr(self.__c(*funcs), self.__f)() if self.__c else self.__f(*funcs)
         return files, score
 
@@ -97,7 +100,7 @@ class Battler:
         return None
 
     @__state_dec(_State.DUMMY, _State.CHECKED, "Wow, you've nailed it")
-    async def check_contestants(self, sols_dir: Path, func_name: str, suffixes: set[str] = None):
+    def check_contestants(self, sols_dir: Path, func_name: str, suffixes: set[str] = None):
         # to import new modules, which were created
         # during the run of the program
         invalidate_caches()
@@ -109,7 +112,8 @@ class Battler:
             if (func := Battler.__import_func(file, func_name)) is not None:
                 self.__funcs[file.stem] = func
 
-    async def run_dummy(self, user_func: Path | Callable, dummy: Path | Callable, *, func_name: str = None):
+    async def run_dummy(self, user_func: Path | Callable, dummy: Path | Callable, *, func_name: str = None,
+                        timeout: float = 1) -> Tuple[Tuple[str, str], Tuple[float, float]] | str:
         # to import new modules, which were created
         # during the run of the program
         invalidate_caches()
@@ -122,11 +126,18 @@ class Battler:
                 f_name = user_func.stem
                 user_func = Battler.__import_func(user_func, func_name)
             funcs.append((f_name, user_func))
-        return self._battle(*funcs), self._battle(*funcs[::-1])
 
+        try:
+            return await asyncio.gather(
+                *(asyncio.wait_for(asyncio.to_thread(self._battle, args), timeout=timeout) for args in
+                  (funcs, funcs[::-1])))
+        except TimeoutError:
+            return "Timed out"
+        except Exception as e:
+            return f"Raised exception: {e}"
 
     @__state_dec(_State.CHECKED, _State.RAN_TOURNAMENT, f"Please load contestants before launching a tournament")
-    async def run_tournament(self, *, n_workers: int = 4, timeout: float = 4):
+    async def run_tournament(self, *, n_workers: int = 4):
         def _check(what, name, l_lim, u_lim):
             warn_template = "{} is not in [{}, {}], changed to {}"
             if not u_lim >= what >= l_lim:
@@ -136,25 +147,19 @@ class Battler:
 
         # add these as constants?
         n_workers = _check(n_workers, "n_workers", 1, 8)
-        timeout = _check(timeout, "timeout", 0.2, 7)
 
         start_time = time.perf_counter()
-        self.__results = []
-        with Pool(n_workers) as pool:
-            res = [pool.apply_async(self._battle, funcs) for funcs in permutations(self.__funcs.items(), 2)]
-            for r in res:
-                try:
-                    self.__results.append(r.get(timeout=timeout))
-                except mpTE:
-                    # didn't find a way to know whom to blame
-                    print("TIMEOUT", file=sys.stderr)
-                except Exception as e:
-                    print(e, file=sys.stderr)
+        executor = ProcessPoolExecutor(max_workers=n_workers)
+        loop = asyncio.get_event_loop()
+        self.__results = await asyncio.gather(
+            *(loop.run_in_executor(executor, self._battle, funcs) for funcs in
+              permutations(self.__funcs.items(), 2)))
+
         print(f"Tournament with {(n := len(self.__funcs)) * (n - 1)} battles "
               f"ended in {time.perf_counter() - start_time:.3f} secs")
 
     @__state_dec(_State.RAN_TOURNAMENT, _State.GOT_RESULTS, f"Please launch a tournament before getting the results")
-    async def form_results(self):
+    def form_results(self):
         self.__score = defaultdict(float)
         for (red, blue), (red_score, blue_score) in self.__results:
             self.__score[red] += red_score
@@ -162,15 +167,15 @@ class Battler:
         return deepcopy(self.__score)
 
     @__state_dec(_State.GOT_RESULTS, _State.DUMMY, f"Please collect the results first `form_results`")
-    async def save_results(self, dst: Path, *, desc=True) -> None:
+    def save_results(self, dst: Path, *, desc=True) -> None:
         """Sort the results and save them in .json format
 
         :param dst: path to save results to
         :param desc: if True, sort in descending order, else ascending
         :return: None
         """
-        async with aiofiles.open(dst, "w") as f:
-            await f.write(json.dumps(sorted(self.__score.items(), key=lambda tup: (1, -1)[desc] * tup[1])))
+        with open(dst, "w") as f:
+            f.write(json.dumps(sorted(self.__score.items(), key=lambda tup: (1, -1)[desc] * tup[1])))
 
 
 if __name__ == "__main__":
@@ -180,9 +185,10 @@ if __name__ == "__main__":
 
     async def _():
         print(await b.run_dummy(Path("mail_saved/alex_sachuk_yandex_ru.py"), func, func_name="func"))
-        await b.check_contestants(Path("./mail_saved"), func_name="func")
-        await b.run_tournament(n_workers=4, timeout=2.5)
-        await b.form_results()
-        await b.save_results(Path("result.json"))
+        b.check_contestants(Path("./mail_saved"), func_name="func")
+        await b.run_tournament(n_workers=4)
+        b.form_results()
+        b.save_results(Path("result.json"))
+
 
     asyncio.run(_())
