@@ -1,12 +1,8 @@
-import logging
-
 import telebot.async_telebot as atb
 import pandas as pd
 import asyncio
 import battler as bt
 from pathlib import Path
-import traceback
-import aiohttp;
 import os
 
 b = bt.Battler(game_cls=bt.Kalah, game_run="play_alpha_beta")
@@ -51,13 +47,6 @@ async def get_doc_messages(message):
     file_id = message.document.file_name
     file_id_info = await bot.get_file(message.document.file_id)
     downloaded_file = await bot.download_file(file_id_info.file_path)
-
-   # if pd.isna(table.loc[str(message.from_user.id), 'try']):
-     #   table.loc[str(message.from_user.id), 'try'] = 1
-   # else:
-     #   table.loc[str(message.from_user.id), 'try'] += 1
-
-    #count_try = '_' + str(table.loc[str(message.from_user.id), 'try'])
 
     src = str(message.from_user.id) + '_test' + '.py'
     old_file = str(message.from_user.id) + '.py'
