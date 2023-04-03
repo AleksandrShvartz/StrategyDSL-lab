@@ -92,15 +92,10 @@ class Battler:
             rel_p = module.absolute().relative_to(Path.cwd())
             m_dir, m_name = rel_p.parent.name, rel_p.stem
             module_name = f"{m_dir and f'{m_dir}.' or ''}{m_name}"
-            imodule = import_module(module_name)
-
-            # leave only non dunder keys (hopefully, user defined)
-            for k in tuple(imodule.__dict__):
-                if not k.startswith("__"):
-                    imodule.__dict__.pop(k)
-            # if not called, uses the cached file contents
-            reload(imodule)
-            return imodule.__dict__[func_name]
+            if module_name in sys.modules:
+                # remove cached module
+                del sys.modules[module_name]
+            return import_module(module_name).__dict__[func_name]
         except ValueError:
             print(f"Path {module.absolute()!r} is not a subpath of {Path.cwd()!r}", file=sys.stderr)
         except KeyError as e:
@@ -110,10 +105,6 @@ class Battler:
 
     @__state_dec(_State.DUMMY, _State.CHECKED, "Wow, you've nailed it")
     def check_contestants(self, sols_dir: Path, func_name: str, suffixes: set[str] = None):
-        # to import new modules, which were created
-        # during the run of the program
-        invalidate_caches()
-
         if suffixes is None:
             suffixes = {".py"}
         self.__funcs = {}
@@ -125,10 +116,6 @@ class Battler:
 
     async def run_dummy(self, user_func: Path | Callable, dummy: Path | Callable, *, func_name: str = None,
                         timeout: float = 1) -> Tuple[Tuple[str, str], Tuple[float, float]] | str:
-        # to import new modules, which were created
-        # during the run of the program
-        invalidate_caches()
-
         if (isinstance(user_func, Path) or isinstance(dummy, Path)) and func_name is None:
             raise ValueError("Function name should be string when passing paths")
         funcs = []
