@@ -10,12 +10,12 @@ from itertools import permutations
 from multiprocessing import Pool, TimeoutError as mpTE
 from pathlib import Path
 from typing import Callable, Tuple, Any, get_type_hints, get_args
+from tqdm.asyncio import tqdm_asyncio
 from kalah import Kalah
 import aiofiles
 from concurrent.futures import ProcessPoolExecutor
 import asyncio
 from concurrent.futures import TimeoutError
-
 
 
 class _State(IntEnum):
@@ -82,7 +82,14 @@ class Battler:
 
     def _battle(self, files_n_funcs: Tuple[Tuple[str, Callable]]) -> Tuple[Tuple[str, str], Tuple[float, float]]:
         files, funcs = zip(*files_n_funcs)
-        score = getattr(self.__c(*funcs), self.__f)() if self.__c else self.__f(*funcs)
+        try:
+            # cython __cinit__
+            score = getattr(self.__c.__new__(self.__c, *funcs), self.__f)() if self.__c else self.__f(*funcs)
+        except AttributeError:
+            # python __init__ as a fallback
+            score = getattr(self.__c(*funcs), self.__f)() if self.__c else self.__f(*funcs)
+        except Exception:
+            score = 0, 0
         return files, score
 
     @staticmethod
@@ -138,7 +145,7 @@ class Battler:
             return f"Raised exception during test run: {e}"
 
     @__state_dec(_State.CHECKED, _State.RAN_TOURNAMENT, f"Please load contestants before launching a tournament")
-    async def run_tournament(self, *, n_workers: int = 4):
+    async def run_tournament(self, *, n_workers: int | None = None):
         def _check(what, name, l_lim, u_lim):
             warn_template = "{} is not in [{}, {}], changed to {}"
             if not u_lim >= what >= l_lim:
@@ -147,12 +154,12 @@ class Battler:
             return what
 
         # add these as constants?
-        n_workers = _check(n_workers, "n_workers", 1, 8)
+        n_workers = n_workers is not None and _check(n_workers, "n_workers", 1, 8) or None
 
         start_time = time.perf_counter()
         executor = ProcessPoolExecutor(max_workers=n_workers)
         loop = asyncio.get_event_loop()
-        self.__results = await asyncio.gather(
+        self.__results = await tqdm_asyncio.gather(
             *(loop.run_in_executor(executor, self._battle, funcs) for funcs in
               permutations(self.__funcs.items(), 2)))
 
@@ -181,13 +188,15 @@ class Battler:
 
 if __name__ == "__main__":
     import asyncio
+
     b = Battler(game_cls=Kalah, game_run="play_alpha_beta")
     from function_template import func
+
 
     async def _():
         print(await b.run_dummy(Path("mail_saved/alex_sachuk_yandex_ru.py"), func, func_name="func"))
         b.check_contestants(Path("./mail_saved"), func_name="func")
-        await b.run_tournament(n_workers=4)
+        await b.run_tournament()
         b.form_results()
         b.save_results(Path("result.json"))
 
