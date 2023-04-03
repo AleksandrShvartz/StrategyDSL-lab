@@ -45,7 +45,7 @@ def parse_file(input_name: Path) -> Path | None:
                 data += c
     # code = gr.parse(data)
     code = simple_transform(data)
-    new_file_name = input_name[:len(input_name) - len(DSL_EXTENSION)] + '.py'
+    new_file_name = input_name[:len(input_name.name) - len(DSL_EXTENSION)] + '.py'
     with open(new_file_name, 'w') as f:
         f.write(code)
     # close file

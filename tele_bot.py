@@ -52,29 +52,32 @@ async def get_doc_messages(message):
     downloaded_file = await bot.download_file(file_id_info.file_path)
     src = str(message.from_user.id) + '_test' + '.py'
     old_file = str(message.from_user.id) + '.py'
-    save_path = save_dir + "/" + src
-    save_path = parse_file(Path(save_path))
-    if save_path:
-        with open(save_path, 'wb') as new_file:
-            new_file.write(downloaded_file)
-        res = await b.run_dummy(Path(save_path), dummy, func_name='func')
+    save_path_py = save_dir + "/" + src
+    save_path = save_dir + '/' + file_name
+
+    with open(save_path, 'wb') as new_file:
+        new_file.write(downloaded_file)
+    check_name = parse_file(Path(save_path))
+    if check_name:
+        os.rename(check_name, save_path_py)
+        res = await b.run_dummy(Path(save_path_py), dummy, func_name='func')
         if isinstance(res, str):
             await bot.send_message(message.from_user.id, res)
-            os.remove(save_path)
+            os.remove(save_path_py)
         else:
             if os.path.exists(save_dir + "/" + old_file):
                 print('Remove old file')
                 os.remove(save_dir + "/" + old_file)
-            os.rename(save_path, save_dir + "/" + old_file)
+            os.rename(save_path_py, save_dir + "/" + old_file)
             await bot.send_message(message.from_user.id, 'Сохранил')
             table.loc[message.from_user.id, 'code'] = Path(save_dir + "/" + old_file)
             print('Add FILE ' + str(message.from_user.id))
     else:
-        await bot.send_message(message.from_user.id, "File has incorrect extension.")
+        await bot.send_message(message.from_user.id, "Incorrect file")
 
 
 async def register(message):
-    if (len(message.text)<11):
+    if len(message.text) < 11:
         await bot.send_message(message.from_user.id, 'Некорректное имя')
         return
     table.loc[message.from_user.id, 'name'] = message.text[9:len(message.text)]
@@ -108,7 +111,7 @@ def run_test():
 
 
 async def send_result(res):
-    print('отпрвка')
+    print('отправка')
     for item in res.items():
         table.loc[int(item[0]), 'score'] = item[1]
         await bot.send_message(item[0], 'Ваш результат в последнем турнире: %.1f' % item[1])
@@ -118,8 +121,8 @@ async def send_result(res):
 async def start_battle():
     await send_text_mes('Раунд начинается, ваше последнее решение примет участие в турнире')
     b.check_contestants(Path(save_dir), func_name="func")
-    await b.run_tournament(n_workers=4, timeout=2.5)
-    res = b.form_results();
+    await b.run_tournament(n_workers=4)
+    res = b.form_results()
     await send_result(res)
     b.save_results(Path("result.json"))
 
