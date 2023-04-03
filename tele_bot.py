@@ -67,11 +67,10 @@ async def get_doc_messages(message):
 
     with open(save_path, 'wb') as new_file:
         new_file.write(downloaded_file)
-    new_file.close()
-    try:
-        await b.run_dummy(Path(save_path), dummy, func_name='func')
-    except Exception as err:
-        await bot.send_message(message.from_user.id, str(err))
+
+    res = await b.run_dummy(Path(save_path), dummy, func_name='func')
+    if isinstance(res, str):
+        await bot.send_message(message.from_user.id, res)
         os.remove(save_path)
     else:
         if os.path.exists(save_dir + "/" + old_file):
