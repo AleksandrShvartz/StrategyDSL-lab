@@ -5,7 +5,7 @@ import warnings
 from collections import defaultdict
 from copy import deepcopy
 from enum import Enum, IntEnum
-from importlib import import_module, invalidate_caches
+from importlib import import_module, invalidate_caches, reload
 from itertools import permutations
 from multiprocessing import Pool, TimeoutError as mpTE
 from pathlib import Path
@@ -94,17 +94,26 @@ class Battler:
 
     @staticmethod
     def __import_func(module: Path, func_name: str):
-        err_msg = "Error importing {} function from module {!r}"
+        imodule = "no module loaded yet"
         try:
             rel_p = module.absolute().relative_to(Path.cwd())
             m_dir, m_name = rel_p.parent.name, rel_p.stem
-            module = f"{m_dir and f'{m_dir}.' or ''}{m_name}"
-            return import_module(module).__dict__[func_name]
+            module_name = f"{m_dir and f'{m_dir}.' or ''}{m_name}"
+            imodule = import_module(module_name)
+
+            # leave only non dunder keys (hopefully, user defined)
+            for k in tuple(imodule.__dict__):
+                if not k.startswith("__"):
+                    imodule.__dict__.pop(k)
+            # if not called, uses the cached file contents
+            reload(imodule)
+            return imodule.__dict__[func_name]
         except ValueError:
             print(f"Path {module.absolute()!r} is not a subpath of {Path.cwd()!r}", file=sys.stderr)
         except KeyError as e:
-            print(err_msg.format(e, module), file=sys.stderr)
-        return None
+            print(f"Error importing {e} function from module {imodule!r}", file=sys.stderr)
+            e.args = f'`{func_name}` function is missing',
+            raise e
 
     @__state_dec(_State.DUMMY, _State.CHECKED, "Wow, you've nailed it")
     def check_contestants(self, sols_dir: Path, func_name: str, suffixes: set[str] = None):
@@ -116,8 +125,10 @@ class Battler:
             suffixes = {".py"}
         self.__funcs = {}
         for file in filter(lambda f: f.suffix in suffixes, sols_dir.iterdir()):
-            if (func := Battler.__import_func(file, func_name)) is not None:
-                self.__funcs[file.stem] = func
+            try:
+                self.__funcs[file.stem] = Battler.__import_func(file, func_name)
+            except Exception as e:
+                print(e, file=sys.stderr)
 
     async def run_dummy(self, user_func: Path | Callable, dummy: Path | Callable, *, func_name: str = None,
                         timeout: float = 1) -> Tuple[Tuple[str, str], Tuple[float, float]] | str:
@@ -131,7 +142,10 @@ class Battler:
         for user_func, f_name in zip((user_func, dummy), ("User func", "Dummy func")):
             if isinstance(user_func, Path):
                 f_name = user_func.stem
-                user_func = Battler.__import_func(user_func, func_name)
+                try:
+                    user_func = Battler.__import_func(user_func, func_name)
+                except Exception as e:
+                    return f"Raised exception during import: {e.__class__.__name__}: {e}"
             funcs.append((f_name, user_func))
 
         try:
@@ -141,7 +155,7 @@ class Battler:
         except TimeoutError:
             return "Timed out"
         except Exception as e:
-            return f"Raised exception: {e}"
+            return f"Raised exception during test run: {e}"
 
     @__state_dec(_State.CHECKED, _State.RAN_TOURNAMENT, f"Please load contestants before launching a tournament")
     async def run_tournament(self, *, n_workers: int = 4):
