@@ -1,22 +1,21 @@
+import asyncio
+import contextlib
 import json
 import sys
 import time
 import warnings
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor, TimeoutError
 from copy import deepcopy
 from enum import Enum, IntEnum
 from importlib import import_module, invalidate_caches, reload
 from itertools import permutations
-from multiprocessing import Pool, TimeoutError as mpTE
+from multiprocessing import Pool
+from multiprocessing import TimeoutError as mpTE
 from pathlib import Path
-from typing import Callable, Tuple, Any, get_type_hints, get_args
-from tqdm.asyncio import tqdm_asyncio
-from kalah import Kalah
-import aiofiles
-from concurrent.futures import ProcessPoolExecutor
-import asyncio
-from concurrent.futures import TimeoutError
+from typing import Any, Callable, Tuple, get_args, get_type_hints
 
+from kalah import Kalah
 
 class _State(IntEnum):
     DUMMY = 0,
@@ -27,18 +26,37 @@ class _State(IntEnum):
 
 
 class Battler:
-
     @staticmethod
     def __state_dec(non_valid, after_state, err_msg):
         def wrapper(func):
-            def inner_wrapper(self, *a, **kw):
+            @contextlib.contextmanager
+            def _inner_wrapper(self):
+                if _inner_wrapper._is_running:
+                    raise RuntimeError("Wait for the previous call to finish")
+                _inner_wrapper._is_running = True
                 if self.__state < non_valid:
                     raise RuntimeError(err_msg)
-                res = func(self, *a, **kw)
-                self.__state = after_state
+                try:
+                    yield
+                finally:
+                    _inner_wrapper._is_running = False
+                    self.__state = after_state
+
+            async def async_inner_wrapper(self, *a, **kw):
+                with _inner_wrapper(self):
+                    res = await func(self, *a, **kw)
                 return res
 
-            return inner_wrapper
+            def sync_inner_wrapper(self, *a, **kw):
+                with _inner_wrapper(self):
+                    res = func(self, *a, **kw)
+                return res
+
+            # allows to run only one _inner_wrapper (to avoid accidentally running two tournaments simultaneously)
+            # should not prevent runs of different wrapped functions: each wrapped function has its own _inner_wrapper
+            # blocks with different class instances, as the wrapped functions are the same instance-wise
+            _inner_wrapper._is_running = False
+            return eval(f"{'a' * asyncio.iscoroutinefunction(func)}sync_inner_wrapper")
 
         return wrapper
 
