@@ -19,6 +19,7 @@ table.index.name = 'id'
 save_dir = 'mail_saved'
 
 
+
 @bot.message_handler(content_types=['text'])
 async def get_text_messages(message):
     if message.text == "/start":
@@ -47,7 +48,6 @@ async def get_doc_messages(message):
     file_id = message.document.file_name
     file_id_info = await bot.get_file(message.document.file_id)
     downloaded_file = await bot.download_file(file_id_info.file_path)
-
     src = str(message.from_user.id) + '_test' + '.py'
     old_file = str(message.from_user.id) + '.py'
     save_path = save_dir + "/" + src
@@ -110,6 +110,7 @@ async def send_result(res):
         await bot.send_message(item[0], 'Ваш результат в последнем турнире: %.1f' % item[1])
 
 
+
 async def start_battle():
     await send_text_mes('Раунд начинается, ваше последнее решение примет участие в турнире')
     b.check_contestants(Path(save_dir), func_name="func")
@@ -117,6 +118,7 @@ async def start_battle():
     res = b.form_results();
     await send_result(res)
     b.save_results(Path("result.json"))
+
 
 
 if __name__ == "__main__":
