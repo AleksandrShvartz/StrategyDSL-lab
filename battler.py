@@ -4,6 +4,7 @@ import json
 import sys
 import time
 import warnings
+from tqdm.asyncio import tqdm_asyncio
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, TimeoutError
 from copy import deepcopy
