@@ -158,7 +158,7 @@ class Battler:
             return f"Raised exception during test run: {e}"
 
     @__state_dec(_State.CHECKED, _State.RAN_TOURNAMENT, f"Please load contestants before launching a tournament")
-    async def run_tournament(self, *, n_workers: int = 4):
+    async def run_tournament(self, *, n_workers: int | None = None):
         def _check(what, name, l_lim, u_lim):
             warn_template = "{} is not in [{}, {}], changed to {}"
             if not u_lim >= what >= l_lim:
@@ -167,7 +167,7 @@ class Battler:
             return what
 
         # add these as constants?
-        n_workers = _check(n_workers, "n_workers", 1, 8)
+        n_workers = n_workers is not None and _check(n_workers, "n_workers", 1, 8) or None
 
         start_time = time.perf_counter()
         executor = ProcessPoolExecutor(max_workers=n_workers)
@@ -207,7 +207,7 @@ if __name__ == "__main__":
     async def _():
         print(await b.run_dummy(Path("mail_saved/alex_sachuk_yandex_ru.py"), func, func_name="func"))
         b.check_contestants(Path("./mail_saved"), func_name="func")
-        await b.run_tournament(n_workers=4)
+        await b.run_tournament()
         b.form_results()
         b.save_results(Path("result.json"))
 
