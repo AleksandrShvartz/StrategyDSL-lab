@@ -1,4 +1,9 @@
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/AleksandrShvartz/StrategyDSL-lab/main.svg)](https://results.pre-commit.ci/latest/github/AleksandrShvartz/StrategyDSL-lab/main)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
+
 # discr-game-lab
+
 Discrete game Laboratory work system
 
 This repository contains
