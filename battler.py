@@ -5,7 +5,7 @@ import warnings
 from collections import defaultdict
 from copy import deepcopy
 from enum import Enum, IntEnum
-from importlib import import_module, invalidate_caches
+from importlib import import_module, invalidate_caches, reload
 from itertools import permutations
 from multiprocessing import Pool, TimeoutError as mpTE
 from pathlib import Path
@@ -87,16 +87,19 @@ class Battler:
 
     @staticmethod
     def __import_func(module: Path, func_name: str):
-        err_msg = "Error importing {} function from module {!r}"
+        imodule = "no module loaded yet"
         try:
             rel_p = module.absolute().relative_to(Path.cwd())
             m_dir, m_name = rel_p.parent.name, rel_p.stem
-            module = f"{m_dir and f'{m_dir}.' or ''}{m_name}"
-            return import_module(module).__dict__[func_name]
+            module_name = f"{m_dir and f'{m_dir}.' or ''}{m_name}"
+            imodule = import_module(module_name)
+            # if not called, uses the cached file contents
+            reload(imodule)
+            return imodule.__dict__[func_name]
         except ValueError:
             print(f"Path {module.absolute()!r} is not a subpath of {Path.cwd()!r}", file=sys.stderr)
         except KeyError as e:
-            print(err_msg.format(e, module), file=sys.stderr)
+            print(f"Error importing {e} function from module {imodule!r}", file=sys.stderr)
         return None
 
     @__state_dec(_State.DUMMY, _State.CHECKED, "Wow, you've nailed it")
