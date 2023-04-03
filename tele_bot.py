@@ -28,9 +28,7 @@ async def get_text_messages(message):
     if message.text == "/start":
         await bot.send_message(message.from_user.id, "Введите /register ФАМИЛИЯ_ИМЯ_ГРУППА для регистрации")
     elif message.text[0:9] == "/register":
-        register(message)
-        await bot.send_message(message.from_user.id, "Можешь загрузить свой файл в любое время")
-
+        await register(message)
     elif message.text == "/start_bt":
         await start_battle()
     elif message.text == "/save_tb":
@@ -74,25 +72,31 @@ async def get_doc_messages(message):
         os.remove(save_path)
     else:
         if os.path.exists(save_dir + "/" + old_file):
-            print('remove')
+            print('Remove old file')
             os.remove(save_dir + "/" + old_file)
         os.rename(save_path, save_dir + "/" + old_file)
         await bot.send_message(message.from_user.id, 'Сохранил')
-        table.loc[str(message.from_user.id), 'code'] = Path(save_dir + "/" + old_file)
-        print(table)
+        table.loc[message.from_user.id, 'code'] = Path(save_dir + "/" + old_file)
+        print('Add FILE ' + str(message.from_user.id))
 
 
-def register(message):
-    table.loc[str(message.from_user.id)] = [message.text[9:len(message.text)], ' ', 0]
-    print(table)
+async def register(message):
+    if (len(message.text)<11):
+        await bot.send_message(message.from_user.id, 'Некорректное имя')
+        return
+    table.loc[message.from_user.id, 'name'] = message.text[9:len(message.text)]
+    await bot.send_message(message.from_user.id, "Можешь загрузить свой файл в любое время")
+    print('Add people ' + str(message.from_user.id))
 
 
 async def save_table():
-    table.to_csv('dsl_table.csv')
+    table.to_excel('dsl_table.xlsx')
+    print('Saving table')
 
 
 async def load_table():
-    temp_table = pd.read_csv('dsl_table.csv', sep=',', index_col='id')
+    temp_table = pd.read_excel('dsl_table.xlsx', index_col='id')
+    print('Load table')
     return temp_table
 
 
@@ -101,6 +105,7 @@ async def print_table():
 
 
 async def send_text_mes(mes):
+    print('Send all msg')
     for user in table.index:
         await bot.send_message(user, mes)
 
@@ -112,7 +117,7 @@ def run_test():
 async def send_result(res):
     print('отпрвка')
     for item in res.items():
-        table.loc[item[0], 'score'] = item[1]
+        table.loc[int(item[0]), 'score'] = item[1]
         await bot.send_message(item[0], 'Ваш результат в последнем турнире: %.1f' % item[1])
 
 
