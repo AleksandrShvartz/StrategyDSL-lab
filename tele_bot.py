@@ -153,7 +153,7 @@ async def start_battle():
         "Раунд начинается, ваше последнее решение примет участие в турнире"
     )
     b.check_contestants(save_dir, func_name="func")
-    await b.run_tournament(n_workers=8)
+    await b.run_tournament()
     res = b.form_results()
     await send_result(res)
     b.save_results(Path("result.json"))
