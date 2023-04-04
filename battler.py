@@ -19,7 +19,6 @@ import warnings
 
 from tqdm.asyncio import tqdm_asyncio
 
-import os
 
 class _State(IntEnum):
     DUMMY = 0
