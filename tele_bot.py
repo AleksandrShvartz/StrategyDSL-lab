@@ -150,7 +150,7 @@ async def start_battle():
     logging.info("Battle start")
     await save_table()
     await send_text_mes(
-        "Раунд начинается, ваше последнее решение примет участие в турнире"
+        "Раунд начинается, ваше последнее решение примет участие в раунде"
     )
     b.check_contestants(save_dir, func_name="func")
     await b.run_tournament()
