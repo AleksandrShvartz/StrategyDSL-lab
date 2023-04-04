@@ -1,6 +1,7 @@
 import os
 import re
 import logging
+from pathlib import Path
 
 from dsl.parser import Grammar
 
@@ -17,10 +18,10 @@ def load_modules():
             modules[name] = exec()
 
 
-def parse_file(input_name: str) -> str | None:
-    if input_name.endswith('.py'):
+def parse_file(input_name: Path) -> Path | None:
+    if input_name.name.endswith('.py'):
         return input_name
-    if not input_name.endswith(DSL_EXTENSION):
+    if not input_name.name.endswith(DSL_EXTENSION):
         logger.info(f'File {input_name} has incorrect extension')
         return None
     if not os.path.isfile(input_name):

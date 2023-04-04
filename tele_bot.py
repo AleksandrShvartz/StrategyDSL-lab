@@ -5,6 +5,8 @@ import battler as bt
 from pathlib import Path
 import os
 
+from dsl.interpreter import parse_file
+
 b = bt.Battler(game_cls=bt.Kalah, game_run="play_alpha_beta")
 
 dummy = Path('mail_test/fedor_novikov.py')
@@ -51,22 +53,24 @@ async def get_doc_messages(message):
     src = str(message.from_user.id) + '_test' + '.py'
     old_file = str(message.from_user.id) + '.py'
     save_path = save_dir + "/" + src
-
-    with open(save_path, 'wb') as new_file:
-        new_file.write(downloaded_file)
-
-    res = await b.run_dummy(Path(save_path), dummy, func_name='func')
-    if isinstance(res, str):
-        await bot.send_message(message.from_user.id, res)
-        os.remove(save_path)
+    save_path = parse_file(Path(save_path))
+    if save_path:
+        with open(save_path, 'wb') as new_file:
+            new_file.write(downloaded_file)
+        res = await b.run_dummy(Path(save_path), dummy, func_name='func')
+        if isinstance(res, str):
+            await bot.send_message(message.from_user.id, res)
+            os.remove(save_path)
+        else:
+            if os.path.exists(save_dir + "/" + old_file):
+                print('Remove old file')
+                os.remove(save_dir + "/" + old_file)
+            os.rename(save_path, save_dir + "/" + old_file)
+            await bot.send_message(message.from_user.id, 'Сохранил')
+            table.loc[message.from_user.id, 'code'] = Path(save_dir + "/" + old_file)
+            print('Add FILE ' + str(message.from_user.id))
     else:
-        if os.path.exists(save_dir + "/" + old_file):
-            print('Remove old file')
-            os.remove(save_dir + "/" + old_file)
-        os.rename(save_path, save_dir + "/" + old_file)
-        await bot.send_message(message.from_user.id, 'Сохранил')
-        table.loc[message.from_user.id, 'code'] = Path(save_dir + "/" + old_file)
-        print('Add FILE ' + str(message.from_user.id))
+        await bot.send_message(message.from_user.id, "File has incorrect extension.")
 
 
 async def register(message):
