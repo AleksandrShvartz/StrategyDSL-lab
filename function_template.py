@@ -3,6 +3,7 @@
 # 2) Do not exit(0) or smth
 # 3) Please do not try to hack us.
 
+
 def func(state: list[int]) -> int:
     """Implementation of minimax strategy
 

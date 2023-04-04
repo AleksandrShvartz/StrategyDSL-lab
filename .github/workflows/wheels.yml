@@ -85,7 +85,7 @@ jobs:
           CIBW_MANYLINUX_I686_IMAGE: ${{ matrix.manylinux_image }}
         with:
             output-dir: wheels/wheelhouse/
-            
+
       - name: Store artifacts
         uses: actions/upload-artifact@v3
         with:
@@ -105,7 +105,7 @@ jobs:
         with:
           python-version: '3.9'  # update once build dependencies are available
 
-      - name: Install dependencies  
+      - name: Install dependencies
         run: |
             pip install -U pip setuptools wheel cython
             python setup.py sdist --dist-dir wheels
@@ -116,13 +116,13 @@ jobs:
           path: wheels/*.tar.gz
 
 
-            
+
 # Upload the wheels and the source distribution
   upload_wheels:
     name: Upload wheels
     runs-on: ubuntu-latest
     needs: [build_wheels, build_sdist]
- 
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -142,4 +142,3 @@ jobs:
             author_email: kmma@fh.4eva
             message: "Add source"
             add: "wheels/*"
-
