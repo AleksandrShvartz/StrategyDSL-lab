@@ -3,6 +3,7 @@
 # 2) Do not exit(0) or smth
 # 3) Please do not try to hack us.
 
+
 def func(state):
     # state is array with length 14.
     # values with indices 0-5 is yours pits, 6 - yours kalah
@@ -31,13 +32,13 @@ def func(state):
         score2 += tmp
         state[i] -= tmp
         mult = 0
-        if (state[i] > 13):
+        if state[i] > 13:
             mult = state[i] // 13
         score1 += mult * 7
         score2 += mult * 6
         state[i] -= mult * 13
 
-        if (state[i] > 7):
+        if state[i] > 7:
             score1 += 7
             score2 += state[i] - 7
         else:
