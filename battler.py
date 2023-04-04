@@ -1,7 +1,6 @@
 import asyncio
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
-from concurrent.futures import TimeoutError
 import contextlib
 from copy import deepcopy
 from enum import IntEnum
@@ -18,7 +17,7 @@ from typing import get_type_hints
 from typing import Tuple
 import warnings
 
-from kalah import Kalah
+from tqdm.asyncio import tqdm_asyncio
 
 
 class _State(IntEnum):
@@ -207,7 +206,7 @@ class Battler:
                     for args in (funcs, funcs[::-1])
                 )
             )
-        except TimeoutError:
+        except asyncio.TimeoutError:
             return "Timed out"
         except Exception as e:
             return f"Raised exception during test run: {e}"
@@ -279,6 +278,7 @@ class Battler:
 
 if __name__ == "__main__":
     import asyncio
+    from kalah import Kalah
 
     b = Battler(game_cls=Kalah, game_run="play_alpha_beta")
     from function_template import func
