@@ -26,7 +26,7 @@ for d in (save_dir, test_dir):
 async def get_text_messages(message):
     if message.text == "/start":
         await bot.send_message(
-            message.from_user.id, "Введите /register [Фамилия Имя /группа] для регистрации"
+            message.from_user.id, "-Введите /register [Фамилия Имя /группа] для регистрации\n-/template для загрузки шаблона функции"
         )
     elif message.text[:9] == "/register":
         await register(message)
@@ -49,7 +49,8 @@ async def get_text_messages(message):
         temp_str = message.text[9:]
         _id, msg = temp_str.split('@')
         await send_msg_to(_id,msg)
-
+    elif message.text == "/template":
+        await send_temp(message)
     else:
         await bot.send_message(message.from_user.id, "Я тебя не понимаю")
 
@@ -85,10 +86,15 @@ async def get_doc_messages(message):
         test_path.unlink()
 
 
+async def send_temp(message):
+    await bot.send_document(message.from_user.id, open(r'function_template.py', 'rb'))
+
+
 async def register(message):
     if len(message.text) < 11:
         await bot.send_message(message.from_user.id, "Некорректное имя")
         return
+
     table.loc[message.from_user.id, "name"] = message.text[9:]
     await bot.send_message(
         message.from_user.id, f"Сохранил: {message.text[9:]}"
@@ -100,6 +106,9 @@ async def register(message):
 async def rename(id, name):
     logging.info(f"Rename -{id}- to {name}")
     table.loc[int(id), "name"] = name
+    await bot.send_message(
+        int(id), f"Ваше имя изменено на: {name}"
+    )
 
 
 async def send_msg_to(id, msg):
