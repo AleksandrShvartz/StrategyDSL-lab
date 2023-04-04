@@ -13,6 +13,8 @@ dummy = Path("mail_test/fedor_novikov.py")
 
 bot = atb.AsyncTeleBot("5998949800:AAGj_6DfBQEbQLe-tC5B78ZdBfy3IG4ALko")
 table = pd.DataFrame({"name": [], "code": [], "score": []})
+# user_id: coro pinger
+pings = {}
 table.index.name = "id"
 save_dir = Path("tourn")
 test_dir = Path("tourn_test")
@@ -80,6 +82,10 @@ async def register(message):
         await bot.send_message(message.from_user.id, "Некорректное имя")
         return
     table.loc[message.from_user.id, "name"] = message.text[9:]
+    # were pinging the unregistered, but they listened to us and registered
+    # cancel the pinging
+    if message.from_user.id in pings:
+        pings[message.from_user.id].cancel()
     await bot.send_message(
         message.from_user.id, "Можешь загрузить свой файл в любое время"
     )
@@ -120,7 +126,44 @@ async def send_result(res):
         )
 
 
+async def _ping(user_id, max_time: int = 15, time_step: int = 5):
+    await bot.send_message(
+        user_id, "Please register, otherwise I will not know whom to assign the score"
+    )
+
+    msgs = [
+        "You've got `{}` seconds to register or else",
+        "`{}` seconds to register",
+        "`{}` seconds ...",
+        "`{}` secs ...",
+    ]
+    d, m = divmod(max_time, time_step)
+    msgs.extend(msgs[~0:] * (d + bool(m) - len(msgs)))
+    print(len(msgs))
+    for idx, time_left in enumerate(range(max_time, 0, -time_step)):
+        print(time_left)
+        await bot.send_message(
+            user_id, msgs[idx].format(time_left), parse_mode="markdown"
+        )
+        await asyncio.sleep(time_step)
+
+    await bot.send_message(
+        user_id, "Time is up, ||*~WASTED~*||", parse_mode="MarkdownV2"
+    )
+
+
+async def ping_unregistered():
+    # ping only users with NaN name
+    for user_id in table[table["name"].isnull()].index:
+        ping = asyncio.create_task(_ping(user_id))
+        ping.add_done_callback(lambda _: (lambda u_id=user_id: pings.pop(u_id))())
+        pings[user_id] = ping
+    # wait for all the pings to finish or be cancelled
+    await asyncio.gather(*pings.values(), return_exceptions=True)
+
+
 async def start_battle():
+    await ping_unregistered()
     await send_text_mes(
         "Раунд начинается, ваше последнее решение примет участие в турнире"
     )
