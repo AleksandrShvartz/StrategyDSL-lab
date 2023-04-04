@@ -87,13 +87,19 @@ class Kalah:
             _, h = self.max_alpha_beta(0, -2000, 2000)
             self._transfer_stones(h)
 
-            self.current_state[:self.__h], self.current_state[self.__h:] = \
-                self.current_state[self.__h:], self.current_state[:self.__h]
+            self.current_state[: self.__h], self.current_state[self.__h :] = (
+                self.current_state[self.__h :],
+                self.current_state[: self.__h],
+            )
             self.player ^= 1
 
         if self.current_state[6] == self.current_state[13]:
-            return .5, .5
-        return (0, 1) if self.current_state[6] < self.current_state[13] ^ self.player else (1, 0)
+            return 0.5, 0.5
+        return (
+            (0, 1)
+            if self.current_state[6] < self.current_state[13] ^ self.player
+            else (1, 0)
+        )
 
 
 def main(a, b) -> tuple[float, float]:
@@ -110,5 +116,7 @@ def main(a, b) -> tuple[float, float]:
 if __name__ == "__main__":
     import typing
 
-    assert typing.get_args(typing.get_type_hints(Kalah.__dict__["play_alpha_beta"])["return"]) == (float, float)
+    assert typing.get_args(
+        typing.get_type_hints(Kalah.__dict__["play_alpha_beta"])["return"]
+    ) == (float, float)
     print(main())
