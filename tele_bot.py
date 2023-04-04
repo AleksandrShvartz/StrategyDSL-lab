@@ -77,7 +77,7 @@ async def get_doc_messages(message):
             parsed_test_path.rename(save_path)
             await bot.send_message(message.from_user.id, "Сохранил")
             table.loc[message.from_user.id, "code"] = save_path
-            logging.info("Add FILE " + str(message.from_user.id))
+            logging.info(f"Add FILE {message.from_user.id}")
     else:
         await bot.send_message(
             message.from_user.id,
@@ -138,7 +138,7 @@ async def send_text_mes(mes):
 
 
 async def send_result(res):
-    logging.info("Send resaults")
+    logging.info("Send results")
     for user_id, score in res.items():
         table.loc[int(user_id), "score"] = score
         await bot.send_message(
