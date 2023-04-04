@@ -64,7 +64,18 @@ async def get_doc_messages(message):
             parsed_test_path.unlink()
         else:
             parsed_test_path.rename(save_path)
-            await bot.send_message(message.from_user.id, "Сохранил")
+            btl_res = {(1, 0): "You won", (0.5, 0.5): "Draw", (0, 1): "You lost"}
+            btl_str = "\n".join(
+                f"{' ' * 4}_{fns[0 + ~0 * i]} func vs. {fns[1 + ~0 * i]} func_: `{btl_res[btl[::1 + ~1 * i]]}`"
+                for i, (fns, (_, btl)) in enumerate(zip(["Your Test".split()] * 2, res))
+            )
+            await bot.send_message(
+                message.from_user.id,
+                f"Saved your file\n\n"
+                f"Your function was tested against a test function:\n"
+                f"{btl_str}",
+                parse_mode="markdown",
+            )
             table.loc[message.from_user.id, "code"] = save_path
             print("Add FILE " + str(message.from_user.id))
     else:
