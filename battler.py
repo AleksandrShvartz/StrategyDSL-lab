@@ -19,6 +19,9 @@ import warnings
 
 from tqdm.asyncio import tqdm_asyncio
 
+import os
+os.environ['NUMEXPR_MAX_THREADS'] = '8'
+os.environ['NUMEXPR_NUM_THREADS'] = '8'
 
 class _State(IntEnum):
     DUMMY = 0
