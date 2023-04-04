@@ -138,7 +138,7 @@ async def send_text_mes(mes):
 
 
 async def send_result(res):
-    logging.info("Send resaults")
+    logging.info("Send results")
     for user_id, score in res.items():
         table.loc[int(user_id), "score"] = score
         await bot.send_message(
