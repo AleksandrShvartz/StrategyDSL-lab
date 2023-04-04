@@ -1,4 +1,3 @@
-import asyncio
 import contextlib
 import json
 import sys
@@ -6,23 +5,23 @@ import time
 import warnings
 from tqdm.asyncio import tqdm_asyncio
 from collections import defaultdict
-from concurrent.futures import ProcessPoolExecutor, TimeoutError
+from asyncio import TimeoutError
+from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
-from enum import Enum, IntEnum
-from importlib import import_module, invalidate_caches, reload
+from enum import IntEnum
+from importlib import import_module
 from itertools import permutations
-from multiprocessing import Pool
-from multiprocessing import TimeoutError as mpTE
 from pathlib import Path
 from typing import Any, Callable, Tuple, get_args, get_type_hints
 
 from kalah import Kalah
 
+
 class _State(IntEnum):
-    DUMMY = 0,
-    INITED = 1,
-    CHECKED = 2,
-    RAN_TOURNAMENT = 3,
+    DUMMY = 0
+    INITED = 1
+    CHECKED = 2
+    RAN_TOURNAMENT = 3
     GOT_RESULTS = 4
 
 

@@ -60,7 +60,7 @@ async def get_doc_messages(message):
     check_name = parse_file(Path(save_path))
     if check_name:
         os.rename(check_name, save_path_py)
-        res = await b.run_dummy(Path(save_path_py), dummy, func_name='func')
+        res = await b.run_dummy(Path(save_path_py), dummy, func_name='func', timeout=6)
         if isinstance(res, str):
             await bot.send_message(message.from_user.id, res)
             os.remove(save_path_py)
