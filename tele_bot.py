@@ -14,22 +14,26 @@ MAX_FILE_SIZE = 4_000
 b = bt.Battler(game_cls=Kalah, game_run="play_alpha_beta")
 
 dummy = Path("mail_test/fedor_novikov.py")
-logging.basicConfig(format='%(asctime)s - %(message)s',level=logging.INFO)
+logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
 bot = atb.AsyncTeleBot("6017129086:AAGdxzhQbVNtOoPjc8gofp_OJS4FhMQ8SoQ")
 table = pd.DataFrame({"name": [], "code": [], "score": []})
 table.index.name = "id"
+
 save_dir = Path("tourn")
 test_dir = Path("tourn_test")
 for d in (save_dir, test_dir):
     if not d.exists():
         d.mkdir(parents=True, exist_ok=True)
+    for f in d.iterdir():
+        f.unlink(missing_ok=True)
 
 
 @bot.message_handler(content_types=["text"])
 async def get_text_messages(message):
     if message.text == "/start":
         await bot.send_message(
-            message.from_user.id, "-Введите /register [Фамилия Имя /группа] для регистрации\n-/template для загрузки шаблона функции"
+            message.from_user.id,
+            "-Введите /register [Фамилия Имя /группа] для регистрации\n-/template для загрузки шаблона функции",
         )
     elif message.text[:9] == "/register":
         await register(message)
@@ -46,12 +50,12 @@ async def get_text_messages(message):
         await print_table()
     elif message.text[:7] == "/rename":
         temp_str = message.text[8:]
-        _id, msg = temp_str.split('@')
+        _id, msg = temp_str.split("@")
         await rename(_id, msg)
     elif message.text[:8] == "/send_to":
         temp_str = message.text[9:]
-        _id, msg = temp_str.split('@')
-        await send_msg_to(_id,msg)
+        _id, msg = temp_str.split("@")
+        await send_msg_to(_id, msg)
     elif message.text == "/template":
         await send_temp(message)
     else:
@@ -85,7 +89,7 @@ async def get_doc_messages(message):
             parsed_test_path.unlink()
             logging.info(f"{res} |user {message.from_user.id}")
         else:
-            parsed_test_path.rename(save_path)
+            parsed_test_path.replace(save_path)
             btl_res = {(1, 0): "You won", (0.5, 0.5): "Draw", (0, 1): "You lost"}
             btl_str = "\n".join(
                 f"{' ' * 4}_{fns[0 + ~0 * i]} func vs. {fns[1 + ~0 * i]} func_: `{btl_res[btl[::1 + ~1 * i]]}`"
@@ -109,7 +113,7 @@ async def get_doc_messages(message):
 
 
 async def send_temp(message):
-    await bot.send_document(message.from_user.id, open(r'function_template.py', 'rb'))
+    await bot.send_document(message.from_user.id, open(r"function_template.py", "rb"))
 
 
 async def register(message):
@@ -118,19 +122,14 @@ async def register(message):
         return
 
     table.loc[message.from_user.id, "name"] = message.text[9:]
-    await bot.send_message(
-        message.from_user.id, f"Сохранил: {message.text[9:]}"
-    )
-    await bot.send_document(message.chat.id, open(r'function_template.py', 'rb'))
+    await bot.send_message(message.from_user.id, f"Сохранил: {message.text[9:]}")
     logging.info(f"Add people - {message.from_user.id} - {message.text[9:]}")
 
 
 async def rename(id, name):
     logging.info(f"Rename -{id}- to {name}")
     table.loc[int(id), "name"] = name
-    await bot.send_message(
-        int(id), f"Ваше имя изменено на: {name}"
-    )
+    await bot.send_message(int(id), f"Ваше имя изменено на: {name}")
 
 
 async def send_msg_to(id, msg):
