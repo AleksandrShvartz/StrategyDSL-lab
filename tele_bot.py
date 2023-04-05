@@ -10,14 +10,20 @@ import telebot.async_telebot as atb
 
 # in bytes
 MAX_FILE_SIZE = 4_000
+# in seconds
+ONE_SACHUK = 3
+SACHUK_COEF = 1.2
 
 b = bt.Battler(game_cls=Kalah, game_run="play_alpha_beta")
 
 dummy = Path("mail_test/fedor_novikov.py")
-logging.basicConfig(format='%(asctime)s - %(message)s',level=logging.INFO)
-bot = atb.AsyncTeleBot("6017129086:AAGdxzhQbVNtOoPjc8gofp_OJS4FhMQ8SoQ")
+logging.basicConfig(format="%(asctime)s - %(message)s")
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+bot = atb.AsyncTeleBot("6034343865:AAFyTsdJKMSljuq9zLKAOWNv3kH8q2_I0es")
 table = pd.DataFrame({"name": [], "code": [], "score": []})
 table.index.name = "id"
+
 save_dir = Path("tourn")
 test_dir = Path("tourn_test")
 for d in (save_dir, test_dir):
@@ -29,7 +35,8 @@ for d in (save_dir, test_dir):
 async def get_text_messages(message):
     if message.text == "/start":
         await bot.send_message(
-            message.from_user.id, "-Введите /register [Фамилия Имя /группа] для регистрации\n-/template для загрузки шаблона функции"
+            message.from_user.id,
+            "-Введите /register [Фамилия Имя /группа] для регистрации\n-/template для загрузки шаблона функции",
         )
     elif message.text[:9] == "/register":
         await register(message)
@@ -46,12 +53,12 @@ async def get_text_messages(message):
         await print_table()
     elif message.text[:7] == "/rename":
         temp_str = message.text[8:]
-        _id, msg = temp_str.split('@')
+        _id, msg = temp_str.split("@")
         await rename(_id, msg)
     elif message.text[:8] == "/send_to":
         temp_str = message.text[9:]
-        _id, msg = temp_str.split('@')
-        await send_msg_to(_id,msg)
+        _id, msg = temp_str.split("@")
+        await send_msg_to(_id, msg)
     elif message.text == "/template":
         await send_temp(message)
     else:
@@ -79,13 +86,15 @@ async def get_doc_messages(message):
         new_file.write(downloaded_file)
     parsed_test_path = parse_file(test_path)
     if parsed_test_path:
-        res = await b.run_dummy(parsed_test_path, dummy, func_name="func")
+        res = await b.run_dummy(
+            parsed_test_path, dummy, func_name="func", timeout=ONE_SACHUK * SACHUK_COEF
+        )
         if isinstance(res, str):
-            await bot.send_message(message.from_user.id, res)
+            await bot.send_message(message.from_user.id, res, parse_mode="markdown")
             parsed_test_path.unlink()
-            logging.info(f"{res} |user {message.from_user.id}")
+            logger.info(f"{res} |user {message.from_user.id}")
         else:
-            parsed_test_path.rename(save_path)
+            parsed_test_path.replace(save_path)
             btl_res = {(1, 0): "You won", (0.5, 0.5): "Draw", (0, 1): "You lost"}
             btl_str = "\n".join(
                 f"{' ' * 4}_{fns[0 + ~0 * i]} func vs. {fns[1 + ~0 * i]} func_: `{btl_res[btl[::1 + ~1 * i]]}`"
@@ -99,7 +108,7 @@ async def get_doc_messages(message):
                 parse_mode="markdown",
             )
             table.loc[message.from_user.id, "code"] = save_path
-            logging.info(f"Add FILE {message.from_user.id}")
+            logger.info(f"Add FILE {message.from_user.id}")
     else:
         await bot.send_message(
             message.from_user.id,
@@ -109,7 +118,7 @@ async def get_doc_messages(message):
 
 
 async def send_temp(message):
-    await bot.send_document(message.from_user.id, open(r'function_template.py', 'rb'))
+    await bot.send_document(message.from_user.id, open(r"function_template.py", "rb"))
 
 
 async def register(message):
@@ -118,34 +127,30 @@ async def register(message):
         return
 
     table.loc[message.from_user.id, "name"] = message.text[9:]
-    await bot.send_message(
-        message.from_user.id, f"Сохранил: {message.text[9:]}"
-    )
-    await bot.send_document(message.chat.id, open(r'function_template.py', 'rb'))
-    logging.info(f"Add people - {message.from_user.id} - {message.text[9:]}")
+    await bot.send_message(message.from_user.id, f"Сохранил: {message.text[9:]}")
+    await bot.send_document(message.chat.id, open(r"function_template.py", "rb"))
+    logger.info(f"Add people - {message.from_user.id} - {message.text[9:]}")
 
 
 async def rename(id, name):
-    logging.info(f"Rename -{id}- to {name}")
+    logger.info(f"Rename -{id}- to {name}")
     table.loc[int(id), "name"] = name
-    await bot.send_message(
-        int(id), f"Ваше имя изменено на: {name}"
-    )
+    await bot.send_message(int(id), f"Ваше имя изменено на: {name}")
 
 
 async def send_msg_to(id, msg):
-    logging.info(f"Send msg to -{id}- text -{msg}-")
+    logger.info(f"Send msg to -{id}- text -{msg}-")
     await bot.send_message(int(id), msg)
 
 
 async def save_table():
     table.to_excel("dsl_table.xlsx")
-    logging.info("Saving table")
+    logger.info("Saved table")
 
 
 async def load_table():
     temp_table = pd.read_excel("dsl_table.xlsx", index_col="id")
-    logging.info("Load table")
+    logger.info("Loaded table")
     return temp_table
 
 
@@ -154,13 +159,13 @@ async def print_table():
 
 
 async def send_text_mes(mes):
-    logging.info("Send all msg")
+    logger.info("Send all msg")
     for user in table.index:
         await bot.send_message(user, mes)
 
 
-async def send_result(res):
-    logging.info("Send results")
+async def send_n_update_result(res):
+    logger.info("Send results")
     for user_id, score in res.items():
         table.loc[int(user_id), "score"] = score
         await bot.send_message(
@@ -169,7 +174,7 @@ async def send_result(res):
 
 
 async def start_battle():
-    logging.info("Battle start")
+    logger.info("Battle start")
     await save_table()
     await send_text_mes(
         "Раунд начинается, ваше последнее решение примет участие в раунде"
@@ -177,9 +182,10 @@ async def start_battle():
     b.check_contestants(save_dir, func_name="func")
     await b.run_tournament()
     res = b.form_results()
-    await send_result(res)
+    await send_n_update_result(res)
     b.save_results(Path("result.json"))
 
 
 if __name__ == "__main__":
+    logger.info("start up")
     asyncio.run(bot.polling())
