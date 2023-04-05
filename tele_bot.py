@@ -10,6 +10,9 @@ import telebot.async_telebot as atb
 
 # in bytes
 MAX_FILE_SIZE = 4_000
+# in seconds
+ONE_SACHUK = 3
+SACHUK_COEF = 1.2
 
 b = bt.Battler(game_cls=Kalah, game_run="play_alpha_beta")
 
@@ -83,7 +86,9 @@ async def get_doc_messages(message):
         new_file.write(downloaded_file)
     parsed_test_path = parse_file(test_path)
     if parsed_test_path:
-        res = await b.run_dummy(parsed_test_path, dummy, func_name="func")
+        res = await b.run_dummy(
+            parsed_test_path, dummy, func_name="func", timeout=ONE_SACHUK * SACHUK_COEF
+        )
         if isinstance(res, str):
             await bot.send_message(message.from_user.id, res, parse_mode="markdown")
             parsed_test_path.unlink()
