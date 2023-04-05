@@ -4,9 +4,11 @@ from concurrent.futures import ProcessPoolExecutor
 import contextlib
 from copy import deepcopy
 from enum import IntEnum
+from functools import partial
 from importlib import import_module
 from itertools import permutations
 import json
+import logging
 from pathlib import Path
 import sys
 import time
@@ -15,9 +17,15 @@ from typing import Callable
 from typing import get_args
 from typing import get_type_hints
 from typing import Tuple
-import warnings
 
 from tqdm.asyncio import tqdm_asyncio
+
+logging.basicConfig(
+    format="%(asctime)s.%(msecs)02d - %(name)s - %(levelname)s - %(message)s",
+    datefmt="m%md%d %I:%M:%S",
+)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class _State(IntEnum):
@@ -117,22 +125,20 @@ class Battler:
             return game_run, game_cls
 
     def _battle(
-        self, files_n_funcs: Tuple[Tuple[str, Callable]]
+        self, files_n_funcs: Tuple[Tuple[str, Callable]], *, suppress_exception=True
     ) -> Tuple[Tuple[str, str], Tuple[float, float]]:
         files, funcs = zip(*files_n_funcs)
         try:
-            # cython __cinit__
-            score = (
-                getattr(self.__c.__new__(self.__c, *funcs), self.__f)()
-                if self.__c
-                else self.__f(*funcs)
-            )
-        except AttributeError:
-            # python __init__ as a fallback
             score = (
                 getattr(self.__c(*funcs), self.__f)() if self.__c else self.__f(*funcs)
             )
-        except Exception:
+        except Exception as e:
+            if not suppress_exception:
+                raise e
+            else:
+                logger.exception(
+                    f"One of these files: {files} caused the following exception:"
+                )
             score = 0, 0
         return files, score
 
@@ -148,15 +154,11 @@ class Battler:
                 del sys.modules[module_name]
             return import_module(module_name).__dict__[func_name]
         except ValueError:
-            print(
-                f"Path {module.absolute()!r} is not a subpath of {Path.cwd()!r}",
-                file=sys.stderr,
+            logger.error(
+                f"Path {module.absolute()!r} is not a subpath of {Path.cwd()!r}"
             )
         except KeyError as e:
-            print(
-                f"Error importing {e} function from module {imodule!r}",
-                file=sys.stderr,
-            )
+            logger.error(f"Error importing {e} function from module {imodule!r}")
             e.args = (f"`{func_name}` function is missing",)
             raise e
 
@@ -165,13 +167,16 @@ class Battler:
         self, sols_dir: Path, func_name: str, suffixes: set[str] = None
     ):
         if suffixes is None:
+            logger.debug("No suffixes were provided, using default '.py'")
             suffixes = {".py"}
         self.__funcs = {}
         for file in filter(lambda f: f.suffix in suffixes, sols_dir.iterdir()):
             try:
                 self.__funcs[file.stem] = Battler.__import_func(file, func_name)
-            except Exception as e:
-                print(e, file=sys.stderr)
+            except Exception:
+                logger.exception(
+                    f"'{file}' caused the following exception during importing:"
+                )
 
     async def run_dummy(
         self,
@@ -193,7 +198,8 @@ class Battler:
                     user_func = Battler.__import_func(user_func, func_name)
                 except Exception as e:
                     return (
-                        f"Raised exception during import: {e.__class__.__name__}: {e}"
+                        f"Raised exception during import\n"
+                        f"`{e.__class__.__name__}: {e}`"
                     )
             funcs.append((f_name, user_func))
 
@@ -201,7 +207,10 @@ class Battler:
             return await asyncio.gather(
                 *(
                     asyncio.wait_for(
-                        asyncio.to_thread(self._battle, args), timeout=timeout
+                        asyncio.to_thread(
+                            partial(self._battle, suppress_exception=False), args
+                        ),
+                        timeout=timeout,
                     )
                     for args in (funcs, funcs[::-1])
                 )
@@ -209,7 +218,9 @@ class Battler:
         except asyncio.TimeoutError:
             return "Timed out"
         except Exception as e:
-            return f"Raised exception during test run: {e}"
+            return (
+                f"Raised exception during test run\n" f"`{e.__class__.__name__}: {e}`"
+            )
 
     @__state_dec(
         _State.CHECKED,
@@ -221,7 +232,7 @@ class Battler:
             warn_template = "{} is not in [{}, {}], changed to {}"
             if not u_lim >= what >= l_lim:
                 what = min(max(what, l_lim), u_lim)
-                warnings.warn(warn_template.format(name, l_lim, u_lim, what))
+                logger.warning(warn_template.format(name, l_lim, u_lim, what))
             return what
 
         # add these as constants?
@@ -239,7 +250,7 @@ class Battler:
             )
         )
 
-        print(
+        logger.info(
             f"Tournament with {(n := len(self.__funcs)) * (n - 1)} battles "
             f"ended in {time.perf_counter() - start_time:.3f} secs"
         )
@@ -254,6 +265,7 @@ class Battler:
         for (red, blue), (red_score, blue_score) in self.__results:
             self.__score[red] += red_score
             self.__score[blue] += blue_score
+        logger.info("Formed the results")
         return deepcopy(self.__score)
 
     @__state_dec(
@@ -274,6 +286,7 @@ class Battler:
                     sorted(self.__score.items(), key=lambda tup: (1, -1)[desc] * tup[1])
                 )
             )
+        logger.info(f"Saved the results to {dst}")
 
 
 if __name__ == "__main__":
@@ -286,10 +299,10 @@ if __name__ == "__main__":
     async def _():
         print(
             await b.run_dummy(
-                Path("mail_saved/alex_sachuk_yandex_ru.py"), func, func_name="func"
+                Path("./mail_test/alex_sachuk_yandex_ru.py"), func, func_name="func"
             )
         )
-        b.check_contestants(Path("./mail_saved"), func_name="func")
+        b.check_contestants(Path("./mail_saved/"), func_name="func")
         await b.run_tournament()
         b.form_results()
         b.save_results(Path("result.json"))
