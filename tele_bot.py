@@ -8,6 +8,9 @@ from kalah import Kalah
 import pandas as pd
 import telebot.async_telebot as atb
 
+# in bytes
+MAX_FILE_SIZE = 4_000
+
 b = bt.Battler(game_cls=Kalah, game_run="play_alpha_beta")
 
 dummy = Path("mail_test/fedor_novikov.py")
@@ -59,6 +62,14 @@ async def get_text_messages(message):
 async def get_doc_messages(message):
     file_name = message.document.file_name
     file_id_info = await bot.get_file(message.document.file_id)
+    if (file_size := file_id_info.file_size) > MAX_FILE_SIZE:
+        await bot.send_message(
+            message.from_user.id,
+            f"The file exceeds the max allowed file size\n"
+            f"`{file_size} > {MAX_FILE_SIZE}` bytes",
+            parse_mode="markdown",
+        )
+        return
     downloaded_file = await bot.download_file(file_id_info.file_path)
 
     save_path = save_dir.joinpath(f"{message.from_user.id}.py")
